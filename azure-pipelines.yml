@@ -1,0 +1,29 @@
+# name is used when setting the versionScheme to 'byBuildNumber' during the pack
+name: $(majorMinorVersion).$(semanticVersion) # $(rev:r) # NOTE: rev resets when retention policy expires
+
+trigger:
+- master
+
+pool: 'Default'
+
+variables:
+  majorMinorVersion: 1.1
+  # semanticVersion counter is automatically incremented by one in each execution of pipeline
+  # second parameter is seed value to reset to every time the referenced majorMinorVersion is changed
+  semanticVersion: $[counter(variables['majorMinorVersion'], 0)]
+
+steps:
+- task: NuGetAuthenticate@0
+
+- task: DotNetCoreCLI@2
+  inputs:
+    command: 'pack'
+    packagesToPack: '**/*.csproj'
+    versioningScheme: byBuildNumber # https://docs.microsoft.com/en-us/azure/devops/pipelines/tasks/build/dotnet-core-cli?view=azure-devops#yaml-snippet
+
+- task: DotNetCoreCLI@2
+  inputs:
+    command: 'push'
+    packagesToPush: '$(Build.ArtifactStagingDirectory)/*.nupkg'
+    nuGetFeedType: 'internal'
+    publishVstsFeed: '6d605454-0791-4e27-8047-a071799d589f'
