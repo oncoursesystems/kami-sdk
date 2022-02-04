@@ -23,7 +23,7 @@ Commits to master will automatically increment the patch number.  If you need to
 ## Setup
 
 ### Initializing
-To use Kami, import the namespace and include the .UseKami() method when initializing the host builder (typically 
+To use Kami, import the namespace and include the .AddKami() method when initializing the host builder (typically 
 found in the Program.cs file)
 
 ```csharp
@@ -31,14 +31,12 @@ using OnCourse.Kami;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var provider = builder.Services.BuildServiceProvider();
-var configuration = provider.GetRequiredService<IConfiguration>();
+builder.Services.AddKamiClient(builder.Configuration);
 
 ...
 
 var app = builder.Build();
 
-app.UseKami(configuration);
 ```
 
 ### Fault Handling / Resilience
@@ -47,7 +45,7 @@ By default, the client will be configured to retry a call up to three times with
 
 ```csharp
 
-app.UseKami(configuration, (p => p.WaitAndRetryAsync(new[]
+builder.Services.AddKamiClient(builder.Configuration, (p => p.WaitAndRetryAsync(new[]
 {
     TimeSpan.FromSeconds(1),
     TimeSpan.FromSeconds(5),

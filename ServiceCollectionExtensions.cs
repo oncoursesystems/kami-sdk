@@ -7,7 +7,13 @@ namespace OnCourse.Kami;
 
 public static class ServiceCollectionExtensions
 {
-    public static IServiceCollection UseKami(this IServiceCollection services, IConfiguration configuration, Func<PolicyBuilder<HttpResponseMessage>, IAsyncPolicy<HttpResponseMessage>>? errorPolicy)
+
+    public static IServiceCollection AddKamiClient(this IServiceCollection services, IConfiguration configuration)
+    {
+        return services.AddKamiClient(configuration, null);
+    }
+
+    public static IServiceCollection AddKamiClient(this IServiceCollection services, IConfiguration configuration, Func<PolicyBuilder<HttpResponseMessage>, IAsyncPolicy<HttpResponseMessage>>? errorPolicy = null)
     {
         services.Configure<KamiOptions>(configuration.GetSection(KamiOptions.SectionName));
 
