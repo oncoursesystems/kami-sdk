@@ -1,11 +1,11 @@
 using System.Text;
-using OnCourse.Kami.Configuration;
-using OnCourse.Kami.Model;
-using OnCourse.Kami.Serialization;
+using Kami.Configuration;
+using Kami.Model;
+using Kami.Serialization;
 using Newtonsoft.Json;
 using Microsoft.Extensions.Options;
 
-namespace OnCourse.Kami;
+namespace Kami;
 
 public interface IKamiClient
 {
@@ -17,7 +17,6 @@ public interface IKamiClient
 
 public class KamiClient : IKamiClient
 {
-
     private readonly HttpClient _httpClient;
     private readonly KamiOptions _kamiOptions;
 
@@ -92,7 +91,6 @@ public class KamiClient : IKamiClient
                     Message = ex.Message
                 };
             }
-
         }
     }
 
@@ -150,7 +148,7 @@ public class KamiClient : IKamiClient
                 };
             }
 
-            sessionResult.ExpirationDate = expirationDate.ToString();
+            sessionResult.ExpirationDate = expirationDate;
             return sessionResult;
         }
         catch (Exception ex)

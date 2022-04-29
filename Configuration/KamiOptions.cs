@@ -1,4 +1,4 @@
-namespace OnCourse.Kami.Configuration;
+namespace Kami.Configuration;
 
 public class KamiOptions
 {

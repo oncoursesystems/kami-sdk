@@ -7,7 +7,7 @@ trigger:
 pool: 'Default'
 
 variables:
-  majorMinorVersion: 1.1
+  majorMinorVersion: 1.0
   # semanticVersion counter is automatically incremented by one in each execution of pipeline
   # second parameter is seed value to reset to every time the referenced majorMinorVersion is changed
   semanticVersion: $[counter(variables['majorMinorVersion'], 0)]
@@ -26,4 +26,4 @@ steps:
     command: 'push'
     packagesToPush: '$(Build.ArtifactStagingDirectory)/*.nupkg'
     nuGetFeedType: 'internal'
-    publishVstsFeed: '6d605454-0791-4e27-8047-a071799d589f'
+    publishVstsFeed: '36ec3112-f793-46fe-974d-a7f8df67d90d/2eaa00ea-ed00-4bd0-9ae2-cf339f32ad48'

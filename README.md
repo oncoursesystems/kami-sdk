@@ -1,4 +1,4 @@
-# Kami API SDK (OnCourse.Kami)
+# Kami API SDK 
 
 Kami API library helps to generate requests for the following services:
 
@@ -27,7 +27,7 @@ To use Kami, import the namespace and include the .AddKami() method when initial
 found in the Program.cs file)
 
 ```csharp
-using OnCourse.Kami;
+using Kami;
 
 var builder = WebApplication.CreateBuilder(args);
 

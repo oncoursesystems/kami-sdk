@@ -1,4 +1,4 @@
-namespace OnCourse.Kami.Model;
+namespace Kami.Model;
 
 public class KamiViewerOptions
 {
