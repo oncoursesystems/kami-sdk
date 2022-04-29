@@ -1,9 +1,9 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using OnCourse.Kami.Configuration;
+using Kami.Configuration;
 using Polly;
 
-namespace OnCourse.Kami;
+namespace Kami;
 
 public static class ServiceCollectionExtensions
 {
