@@ -6,7 +6,6 @@ on:
     workflow_dispatch:
 
 env:
-    NET_VERSION: '6.0.x'
     PROJECT_FILE: Kami.Sdk.csproj
     RELEASE_NAME: Kami.Sdk
 
@@ -15,16 +14,15 @@ jobs:
         runs-on: self-hosted
 
         steps:
-        - name: Checkout
+        - name: ⬇️ Checkout repository
           uses: actions/checkout@v3
           with:
             fetch-depth: 0 # avoid shallow clone so nbgv can do its work
 
-        - name: Setup .NET SDK ${{ env.NET_VERSION }}
-          uses: actions/setup-dotnet@v3
+        - name: ⚙️ Set up Dotnet Core
+          uses: actions/setup-dotnet@v2
           with:
-            dotnet-version: ${{ env.NET_VERSION }}
-            dotnet-quality: 'ga'
+            dotnet-version: 6.0.x
 
         - name: Bump Package Version
           uses: dotnet/nbgv@v0.4
