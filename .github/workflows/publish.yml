@@ -1,0 +1,50 @@
+name: Publish
+
+on:
+    push:
+        branches: [master]
+    workflow_dispatch:
+
+env:
+    NET_VERSION: '6.x'
+    PROJECT_FILE: Kami.Sdk.csproj
+    RELEASE_NAME: Kami.Sdk
+
+jobs:
+    publish:
+        runs-on: self-hosted
+
+        steps:
+        - name: Checkout
+          uses: actions/checkout@v3
+          with:
+            fetch-depth: 0 # avoid shallow clone so nbgv can do its work
+
+        - name: Setup .NET SDK ${{ env.NET_VERSION }}
+          uses: actions/setup-dotnet@v3
+          with:
+            dotnet-version: ${{ env.NET_VERSION }}
+            dotnet-quality: 'ga'
+
+        - name: Bump Package Version
+          uses: dotnet/nbgv@v0.4
+          id: nbgv
+
+        - name: Setup NuGet
+          run: dotnet nuget add source --username oncoursesystems --password ${{ secrets.GITHUB_TOKEN }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/oncoursesystems/index.json"
+
+        - name: Pack
+          run: dotnet pack -c Release -i . '${{ env.PROJECT_FILE }}'
+
+        - name: Publish
+          run: dotnet nuget push *.nupkg --api-key ${{ secrets.GITHUB_TOKEN }} --source "github"
+
+        - name: Create release
+          uses: actions/create-release@v1
+          env: 
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          with:
+            tag_name: v${{ steps.nbgv.outputs.NuGetPackageVersion }}
+            release_name: ${{ env.RELEASE_NAME }} ${{ steps.nbgv.outputs.NuGetPackageVersion }}
+            draft: false
+            prerelease: false

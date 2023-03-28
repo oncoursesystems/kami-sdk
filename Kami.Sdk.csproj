@@ -3,9 +3,32 @@
     <TargetFramework>net6.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <PropertyGroup>
+    <!-- Version numbers are automatically updated by gitversion when a release is released -->
+    <!-- In the source tree the version will always be 1.0.0 for all projects. -->
+    <!-- Do not modify these. Do NOT commit after manually running `dotnet-gitversion /updateprojectfiles` -->
+    <AssemblyVersion>1.0.0</AssemblyVersion>
+    <FileVersion>1.0.0</FileVersion>
+    <Version>1.0.0</Version>
+    <InformationalVersion>1.0.0</InformationalVersion>
+  </PropertyGroup>
+  <PropertyGroup>
     <PackageId>Kami</PackageId>
     <Authors>OnCourse Systems For Education</Authors>
-    <Description>Kami API Client</Description>
+		<Company>oncoursesystems</Company>
+		<Product>Kami SDK for .NET</Product>
+		<Title>Kami SDK for .NET</Title>
+		<Description>Kami API client.</Description>
+    <PackageId>Kami.Sdk</PackageId>
+		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+		<PackageProjectUrl>https://github.com/oncoursesystems/kami-sdk</PackageProjectUrl>
+		<PackageIcon>kami.png</PackageIcon>
+		<PackageTags>kami sdk csharp net netcore netstandard desktop web mobile</PackageTags>
+		<RepositoryType>git</RepositoryType>
+		<RepositoryUrl>https://github.com/oncoursesystems/kami-sdk.git</RepositoryUrl>
+		<RepositoryBranch>master</RepositoryBranch>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.1"/>
