@@ -6,7 +6,6 @@ on:
     workflow_dispatch:
 
 env:
-    PROJECT_FILE: Kami.Sdk.csproj
     RELEASE_NAME: Kami.Sdk
 
 jobs:
@@ -24,17 +23,31 @@ jobs:
           with:
             dotnet-version: 6.0.x
 
-        - name: Bump Package Version
-          uses: dotnet/nbgv@v0.4
-          id: nbgv
+        # - name: Bump package version
+        #   uses: dotnet/nbgv@v0.4
+        #   id: nbgv
 
-        - name: Setup NuGet
+        - name: Install and calculate the new version with GitVersion 
+          uses: gittools/actions/gitversion/setup@v0.10.2
+          with:
+            versionSpec: 5.x
+    
+        - name: Determine Version
+          uses: gittools/actions/gitversion/execute@v0.10.2
+          id: gitversion # step id used as reference for output values
+    
+        - name: Display GitVersion outputs
+          run: |
+            echo "Version: ${{ steps.gitversion.outputs.SemVer }}"
+            echo "CommitsSinceVersionSource: ${{ steps.gitversion.outputs.CommitsSinceVersionSource }}"
+    
+        - name: Setup GitHub Packages
           run: dotnet nuget add source --username oncoursesystems --password ${{ secrets.GITHUB_TOKEN }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/oncoursesystems/index.json"
 
         - name: Pack
-          run: dotnet pack -c Release -i . '${{ env.PROJECT_FILE }}'
+          run: dotnet pack -c Release -p:Version='${{ steps.gitversion.outputs.SemVer }}' -i . 
 
-        - name: Publish
+        - name: Publish to GitHub Packages
           run: dotnet nuget push *.nupkg --api-key ${{ secrets.GITHUB_TOKEN }} --source "github"
 
         - name: Create release
@@ -42,7 +55,7 @@ jobs:
           env: 
             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           with:
-            tag_name: v${{ steps.nbgv.outputs.NuGetPackageVersion }}
-            release_name: ${{ env.RELEASE_NAME }} ${{ steps.nbgv.outputs.NuGetPackageVersion }}
+            tag_name: v${{ steps.gitversion.outputs.SemVer }}
+            release_name: ${{ env.RELEASE_NAME }} ${{ steps.gitversion.outputs.SemVer }}
             draft: false
             prerelease: false
