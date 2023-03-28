@@ -6,7 +6,7 @@ on:
     workflow_dispatch:
 
 env:
-    NET_VERSION: '6.x'
+    NET_VERSION: '6.0.x'
     PROJECT_FILE: Kami.Sdk.csproj
     RELEASE_NAME: Kami.Sdk
 
