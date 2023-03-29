@@ -12,14 +12,6 @@ Kami API library helps to generate requests for the following services:
 https://kamiembeddingapi.docs.apiary.io/
 
 
-## Nuget / Pipeline
-
-This is a library published to the [OnCourse Nuget Feed](https://dev.azure.com/oncoursesystems/Public%20Packages/_packaging?_a=feed&feed=OnCourseFeed).  You will need the latest version of the [**Azure Artifacts credential provider**](https://dev.azure.com/oncoursesystems/Public%20Packages/_packaging?_a=connect&feed=OnCourseFeed) installed locally to be able to run a dotnet restore and the nuget.config file provided in the same page in order to reference the package in another project.
-
-### Versioning 
-
-Commits to master will automatically increment the patch number.  If you need to update the major/minor numbers, that is done in the azure-pipelines.yml file.  Any change to the major/minor numbers will automatically reset the patch number back to 0.
-
 ## Setup
 
 ### Initializing
@@ -60,7 +52,7 @@ Additional configuration can be done in the appSettings.config file within the "
 ```json
 {
     "Kami": {
-        "Token": "Token fxnDs3BDz-B3fLjK-PGU",
+        "Token": "Token #####################",
         "BaseAddress": "https://api.notablepdf.com/",
         "AllowedExtensions": [
             "doc",

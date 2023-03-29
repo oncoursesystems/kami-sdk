@@ -1,0 +1,26 @@
+name: Build and Test 
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: self-hosted
+
+    steps:
+      - uses: actions/checkout@v3
+    
+      - name: Setup .NET Core
+        uses: actions/setup-dotnet@v3.0.3
+        with:
+          dotnet-version: 6.0.x
+
+      - name: Install dependencies
+        run: |
+          dotnet restore
+
+      - name: Build Debug
+        run: dotnet build --configuration Debug --no-restore
