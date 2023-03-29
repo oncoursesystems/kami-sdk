@@ -4,6 +4,7 @@ using Kami.Model;
 using Kami.Serialization;
 using Newtonsoft.Json;
 using Microsoft.Extensions.Options;
+using System.Globalization;
 
 namespace Kami;
 
@@ -34,7 +35,7 @@ public class KamiClient : IKamiClient
             return false;
 
         if (ext[0] == '.')
-            ext = ext.Substring(1);
+            ext = ext[1..];
 
         return _kamiOptions.AllowedExtensions.Contains(ext.ToLower());
     }
@@ -52,63 +53,59 @@ public class KamiClient : IKamiClient
             };
         }
 
-        using (var multiPartContent = new MultipartFormDataContent(boundary))
+        using var multiPartContent = new MultipartFormDataContent(boundary);
+        var fileNameContent = new StringContent(fileName);
+        fileNameContent.Headers.TryAddWithoutValidation("Content-Disposition", "form-data; name=\"name\"");
+        multiPartContent.Add(fileNameContent);
+
+        var documentContent = new ByteArrayContent(file);
+        documentContent.Headers.TryAddWithoutValidation("Content-Disposition", $"form-data; name=\"document\"; filename=\"{fileName}\"");
+        documentContent.Headers.TryAddWithoutValidation("Content-Type", contentType);
+        multiPartContent.Add(documentContent);
+
+        var response = await _httpClient.PostAsync("upload/embed/documents", multiPartContent).ConfigureAwait(false);
+
+        if (!response.IsSuccessStatusCode)
         {
-            var fileNameContent = new StringContent(fileName);
-            fileNameContent.Headers.TryAddWithoutValidation("Content-Disposition", "form-data; name=\"name\"");
-            multiPartContent.Add(fileNameContent);
-
-            var documentContent = new ByteArrayContent(file);
-            documentContent.Headers.TryAddWithoutValidation("Content-Disposition", $"form-data; name=\"document\"; filename=\"{fileName}\"");
-            documentContent.Headers.TryAddWithoutValidation("Content-Type", contentType);
-            multiPartContent.Add(documentContent);
-
-            var response = await _httpClient.PostAsync("upload/embed/documents", multiPartContent);
-
-            if (!response.IsSuccessStatusCode)
+            return new KamiUploadResult
             {
-                return new KamiUploadResult
-                {
-                    Success = false,
-                    Message = response.ReasonPhrase
-                };
-            }
+                Success = false,
+                Message = response.ReasonPhrase
+            };
+        }
 
-            try
+        try
+        {
+            var data = response.Content.ReadAsStringAsync().Result;
+            return JsonConvert.DeserializeObject<KamiUploadResult>(data, JsonSerialization.GetDefaultSerializerSettings()) ?? new KamiUploadResult
             {
-                var data = response.Content.ReadAsStringAsync().Result;
-                return JsonConvert.DeserializeObject<KamiUploadResult>(data, JsonSerialization.GetDefaultSerializerSettings()) ?? new KamiUploadResult
-                {
-                    Success = false,
-                    Message = "Could not deserialize upload result"
-                };
-            }
-            catch (Exception ex)
+                Success = false,
+                Message = "Could not deserialize upload result"
+            };
+        }
+        catch (Exception ex)
+        {
+            return new KamiUploadResult
             {
-                return new KamiUploadResult
-                {
-                    Success = false,
-                    Message = ex.Message
-                };
-            }
+                Success = false,
+                Message = ex.Message
+            };
         }
     }
 
     public async Task<KamiDeleteResult> DeleteFile(string documentIdentifier)
     {
-        using (var response = await _httpClient.DeleteAsync("embed/documents/" + documentIdentifier))
+        using var response = await _httpClient.DeleteAsync("embed/documents/" + documentIdentifier).ConfigureAwait(false);
+        return new KamiDeleteResult
         {
-            return new KamiDeleteResult
-            {
-                Success = response.IsSuccessStatusCode,
-                Message = response.ReasonPhrase
-            };
-        }
+            Success = response.IsSuccessStatusCode,
+            Message = response.ReasonPhrase
+        };
     }
 
     public async Task<KamiCreateViewSessionResult> CreateViewSession(string documentIdentifier, string userName, string userId, DateTime? expiresAt = null, KamiViewerOptions? viewerOptions = null, bool editable = true)
     {
-        var expirationDate = (expiresAt ?? DateTime.Now.AddYears(1)).ToString();
+        var expirationDate = (expiresAt ?? DateTime.Now.AddYears(1)).ToString(CultureInfo.InvariantCulture);
         var requestJson = JsonConvert.SerializeObject(new
         {
             DocumentIdentifier = documentIdentifier,
@@ -123,7 +120,7 @@ public class KamiClient : IKamiClient
         }, JsonSerialization.GetDefaultSerializerSettings());
 
         var content = new StringContent(requestJson, Encoding.Default, "application/json");
-        var response = await _httpClient.PostAsync("embed/sessions", content);
+        var response = await _httpClient.PostAsync("embed/sessions", content).ConfigureAwait(false);
 
         if (!response.IsSuccessStatusCode)
         {
@@ -136,7 +133,7 @@ public class KamiClient : IKamiClient
 
         try
         {
-            var data = await response.Content.ReadAsStringAsync();
+            var data = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
             var sessionResult = JsonConvert.DeserializeObject<KamiCreateViewSessionResult>(data, JsonSerialization.GetDefaultSerializerSettings());
 
             if (sessionResult == null)
@@ -163,19 +160,17 @@ public class KamiClient : IKamiClient
 
     public async Task<KamiDocumentExportResult> ExportFile(string documentIdentifier, string exportType = "inline")
     {
-        var result = await CreateDocumentExport(documentIdentifier, exportType);
+        var result = await CreateDocumentExport(documentIdentifier, exportType).ConfigureAwait(false);
 
         while (result?.Status == "pending")
         {
-            result = await GetDocumentExport(result.Id);
+            result = await GetDocumentExport(result.Id).ConfigureAwait(false);
         }
 
         if (result?.Status == "done")
         {
-            using (var client = new HttpClient())
-            {
-                result.FileBytes = await client.GetByteArrayAsync(result.FileUrl);
-            }
+            using var client = new HttpClient();
+            result.FileBytes = await client.GetByteArrayAsync(result.FileUrl).ConfigureAwait(false);
         }
 
         return result ?? new KamiDocumentExportResult
@@ -193,68 +188,64 @@ public class KamiClient : IKamiClient
             ExportType = exportType
         }, JsonSerialization.GetDefaultSerializerSettings());
 
-        using (var content = new StringContent(requestJson, Encoding.Default, "application/json"))
-        using (var response = await _httpClient.PostAsync("embed/exports", content))
+        using var content = new StringContent(requestJson, Encoding.Default, "application/json");
+        using var response = await _httpClient.PostAsync("embed/exports", content).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode)
         {
-            if (!response.IsSuccessStatusCode)
+            return new KamiDocumentExportResult
             {
-                return new KamiDocumentExportResult
-                {
-                    Status = "error",
-                    ErrorType = response.ReasonPhrase
-                };
-            }
+                Status = "error",
+                ErrorType = response.ReasonPhrase
+            };
+        }
 
-            try
+        try
+        {
+            var data = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+            return JsonConvert.DeserializeObject<KamiDocumentExportResult>(data, JsonSerialization.GetDefaultSerializerSettings()) ?? new KamiDocumentExportResult
             {
-                var data = await response.Content.ReadAsStringAsync();
-                return JsonConvert.DeserializeObject<KamiDocumentExportResult>(data, JsonSerialization.GetDefaultSerializerSettings()) ?? new KamiDocumentExportResult
-                {
-                    Status = "error",
-                    ErrorType = "Could not deserialize document export result"
-                };
-            }
-            catch (Exception ex)
+                Status = "error",
+                ErrorType = "Could not deserialize document export result"
+            };
+        }
+        catch (Exception ex)
+        {
+            return new KamiDocumentExportResult
             {
-                return new KamiDocumentExportResult
-                {
-                    Status = "error",
-                    ErrorType = ex.Message
-                };
-            }
+                Status = "error",
+                ErrorType = ex.Message
+            };
         }
     }
 
     private async Task<KamiDocumentExportResult> GetDocumentExport(string exportId)
     {
-        using (var response = await _httpClient.GetAsync("embed/exports/" + exportId))
+        using var response = await _httpClient.GetAsync("embed/exports/" + exportId).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode)
         {
-            if (!response.IsSuccessStatusCode)
+            return new KamiDocumentExportResult
             {
-                return new KamiDocumentExportResult
-                {
-                    Status = "error",
-                    ErrorType = response.ReasonPhrase
-                };
-            }
+                Status = "error",
+                ErrorType = response.ReasonPhrase
+            };
+        }
 
-            try
+        try
+        {
+            var data = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+            return JsonConvert.DeserializeObject<KamiDocumentExportResult>(data, JsonSerialization.GetDefaultSerializerSettings()) ?? new KamiDocumentExportResult
             {
-                var data = await response.Content.ReadAsStringAsync();
-                return JsonConvert.DeserializeObject<KamiDocumentExportResult>(data, JsonSerialization.GetDefaultSerializerSettings()) ?? new KamiDocumentExportResult
-                {
-                    Status = "error",
-                    ErrorType = "Could not deserialize document export result"
-                };
-            }
-            catch (Exception ex)
+                Status = "error",
+                ErrorType = "Could not deserialize document export result"
+            };
+        }
+        catch (Exception ex)
+        {
+            return new KamiDocumentExportResult
             {
-                return new KamiDocumentExportResult
-                {
-                    Status = "error",
-                    ErrorType = ex.Message
-                };
-            }
+                Status = "error",
+                ErrorType = ex.Message
+            };
         }
     }
 }

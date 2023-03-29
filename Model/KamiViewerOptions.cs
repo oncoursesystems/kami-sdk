@@ -8,19 +8,22 @@ public class KamiViewerOptions
     public bool ShowHelp { get; set; } = true;
     public bool ShowMenu { get; set; } = true;
     public KamiToolVisibility ToolVisibility { get; set; } = new KamiToolVisibility();
+}
 
-    public static KamiViewerOptions Mobile = new KamiViewerOptions
+public class KamiViewerMobileOptions : KamiViewerOptions
+{
+    public KamiViewerMobileOptions()
     {
-        ShowPrint = false,
-        ShowMenu = false,
-        ShowHelp = false,
+        ShowPrint = false;
+        ShowMenu = false;
+        ShowHelp = false;
         ToolVisibility = new KamiToolVisibility
         {
             Equation = false,
             Comment = false,
             Autograph = false
-        }
-    };
+        };
+    }
 }
 
 public class KamiToolVisibility

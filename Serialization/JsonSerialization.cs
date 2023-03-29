@@ -2,29 +2,28 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Serialization;
 
-namespace Kami.Serialization
+namespace Kami.Serialization;
+
+public static class JsonSerialization
 {
-    public static class JsonSerialization
+    public static JsonSerializerSettings GetDefaultSerializerSettings()
     {
-        public static JsonSerializerSettings GetDefaultSerializerSettings()
+        var converters = new JsonConverterCollection
         {
-            var converters = new JsonConverterCollection
-            {
-                new StringEnumConverter()
-            };
+            new StringEnumConverter()
+        };
 
-            var settings = new JsonSerializerSettings
+        var settings = new JsonSerializerSettings
+        {
+            Formatting = Formatting.None,
+            NullValueHandling = NullValueHandling.Ignore,
+            Converters = converters,
+            ContractResolver = new DefaultContractResolver
             {
-                Formatting = Formatting.None,
-                NullValueHandling = NullValueHandling.Ignore,
-                Converters = converters,
-                ContractResolver = new DefaultContractResolver
-                {
-                    NamingStrategy = new SnakeCaseNamingStrategy()
-                }
-            };
+                NamingStrategy = new SnakeCaseNamingStrategy()
+            }
+        };
 
-            return settings;
-        }
+        return settings;
     }
 }
