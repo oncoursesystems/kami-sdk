@@ -23,7 +23,7 @@
     <PackageIcon>kami.png</PackageIcon>
   </PropertyGroup>
   <ItemGroup>
-		<PackageReference Include="Ardalis.GuardClauses" Version="4.0.1" />
+		<PackageReference Include="Ardalis.GuardClauses" Version="4.1.1" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3"/>
     <PackageReference Include="Microsoft.Extensions.Options" Version="7.0.1"/>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="7.0.0"/>
