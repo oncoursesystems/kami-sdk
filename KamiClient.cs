@@ -10,20 +10,26 @@ namespace OnCourse.Kami;
 
 public interface IKamiClient
 {
-    Task<KamiUploadResult> UploadFile(byte[] file, string contentType, string fileName);
-    Task<KamiDeleteResult> DeleteFile(string documentIdentifier);
-    Task<KamiCreateViewSessionResult> CreateViewSession(string documentIdentifier, string userName, string userId, DateTime? expiresAt = null, KamiViewerOptions? viewerOptions = null, bool editable = true);
-    Task<KamiDocumentExportResult> ExportFile(string documentIdentifier, string exportType = "inline");
+    Task<KamiUploadResult> UploadFile(byte[] file, string contentType, string fileName, CancellationToken cancellationToken = default);
+    Task<KamiDeleteResult> DeleteFile(string documentIdentifier, CancellationToken cancellationToken = default);
+    Task<KamiCreateViewSessionResult> CreateViewSession(string documentIdentifier, string userName, string userId, DateTime? expiresAt = null, KamiViewerOptions? viewerOptions = null, bool editable = true, CancellationToken cancellationToken = default);
+    Task<KamiDocumentExportResult> ExportFile(string documentIdentifier, string exportType = "inline", CancellationToken cancellationToken = default);
 }
 
 public class KamiClient : IKamiClient
 {
+    // Name of the unconfigured factory client used to download exported files from Kami's storage host.
+    // It must NOT be the typed client, whose default Authorization header would leak to a foreign host.
+    private const string ExportDownloadClientName = "KamiExportDownload";
+
     private readonly HttpClient _httpClient;
+    private readonly IHttpClientFactory _httpClientFactory;
     private readonly KamiOptions _kamiOptions;
 
-    public KamiClient(HttpClient httpClient, IOptions<KamiOptions> kamiOptions)
+    public KamiClient(HttpClient httpClient, IHttpClientFactory httpClientFactory, IOptions<KamiOptions> kamiOptions)
     {
         _httpClient = httpClient;
+        _httpClientFactory = httpClientFactory;
         _kamiOptions = kamiOptions.Value;
     }
 
@@ -40,7 +46,7 @@ public class KamiClient : IKamiClient
         return _kamiOptions.AllowedExtensions.Contains(ext.ToLower());
     }
 
-    public async Task<KamiUploadResult> UploadFile(byte[] file, string contentType, string fileName)
+    public async Task<KamiUploadResult> UploadFile(byte[] file, string contentType, string fileName, CancellationToken cancellationToken = default)
     {
         const string boundary = "-----BOUNDARY";
 
@@ -63,7 +69,7 @@ public class KamiClient : IKamiClient
         documentContent.Headers.TryAddWithoutValidation("Content-Type", contentType);
         multiPartContent.Add(documentContent);
 
-        var response = await _httpClient.PostAsync("upload/embed/documents", multiPartContent).ConfigureAwait(false);
+        using var response = await _httpClient.PostAsync("upload/embed/documents", multiPartContent, cancellationToken).ConfigureAwait(false);
 
         if (!response.IsSuccessStatusCode)
         {
@@ -76,7 +82,7 @@ public class KamiClient : IKamiClient
 
         try
         {
-            var data = response.Content.ReadAsStringAsync().Result;
+            var data = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
             return JsonConvert.DeserializeObject<KamiUploadResult>(data, JsonSerialization.GetDefaultSerializerSettings()) ?? new KamiUploadResult
             {
                 Success = false,
@@ -93,9 +99,9 @@ public class KamiClient : IKamiClient
         }
     }
 
-    public async Task<KamiDeleteResult> DeleteFile(string documentIdentifier)
+    public async Task<KamiDeleteResult> DeleteFile(string documentIdentifier, CancellationToken cancellationToken = default)
     {
-        using var response = await _httpClient.DeleteAsync("embed/documents/" + documentIdentifier).ConfigureAwait(false);
+        using var response = await _httpClient.DeleteAsync("embed/documents/" + documentIdentifier, cancellationToken).ConfigureAwait(false);
         return new KamiDeleteResult
         {
             Success = response.IsSuccessStatusCode,
@@ -103,9 +109,9 @@ public class KamiClient : IKamiClient
         };
     }
 
-    public async Task<KamiCreateViewSessionResult> CreateViewSession(string documentIdentifier, string userName, string userId, DateTime? expiresAt = null, KamiViewerOptions? viewerOptions = null, bool editable = true)
+    public async Task<KamiCreateViewSessionResult> CreateViewSession(string documentIdentifier, string userName, string userId, DateTime? expiresAt = null, KamiViewerOptions? viewerOptions = null, bool editable = true, CancellationToken cancellationToken = default)
     {
-        var expirationDate = (expiresAt ?? DateTime.Now.AddYears(1)).ToString(CultureInfo.InvariantCulture);
+        var expirationDate = (expiresAt ?? DateTime.UtcNow.AddYears(1)).ToString(CultureInfo.InvariantCulture);
         var requestJson = JsonConvert.SerializeObject(new
         {
             DocumentIdentifier = documentIdentifier,
@@ -119,8 +125,8 @@ public class KamiClient : IKamiClient
             Editable = editable
         }, JsonSerialization.GetDefaultSerializerSettings());
 
-        var content = new StringContent(requestJson, Encoding.Default, "application/json");
-        var response = await _httpClient.PostAsync("embed/sessions", content).ConfigureAwait(false);
+        using var content = new StringContent(requestJson, Encoding.UTF8, "application/json");
+        using var response = await _httpClient.PostAsync("embed/sessions", content, cancellationToken).ConfigureAwait(false);
 
         if (!response.IsSuccessStatusCode)
         {
@@ -133,7 +139,7 @@ public class KamiClient : IKamiClient
 
         try
         {
-            var data = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+            var data = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
             var sessionResult = JsonConvert.DeserializeObject<KamiCreateViewSessionResult>(data, JsonSerialization.GetDefaultSerializerSettings());
 
             if (sessionResult == null)
@@ -158,19 +164,34 @@ public class KamiClient : IKamiClient
         }
     }
 
-    public async Task<KamiDocumentExportResult> ExportFile(string documentIdentifier, string exportType = "inline")
+    public async Task<KamiDocumentExportResult> ExportFile(string documentIdentifier, string exportType = "inline", CancellationToken cancellationToken = default)
     {
-        var result = await CreateDocumentExport(documentIdentifier, exportType).ConfigureAwait(false);
+        var result = await CreateDocumentExport(documentIdentifier, exportType, cancellationToken).ConfigureAwait(false);
 
+        // Poll until the export finishes, with a delay between attempts and a hard cap so a stuck
+        // export can't spin a tight, unbounded loop hammering the Kami API.
+        var attempts = 0;
         while (result?.Status == "pending")
         {
-            result = await GetDocumentExport(result.Id).ConfigureAwait(false);
+            if (++attempts > _kamiOptions.ExportMaxPollAttempts)
+            {
+                return new KamiDocumentExportResult
+                {
+                    Status = "error",
+                    ErrorType = "Timed out waiting for the document export to complete"
+                };
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(_kamiOptions.ExportPollIntervalSeconds), cancellationToken).ConfigureAwait(false);
+            result = await GetDocumentExport(result.Id, cancellationToken).ConfigureAwait(false);
         }
 
         if (result?.Status == "done")
         {
-            using var client = new HttpClient();
-            result.FileBytes = await client.GetByteArrayAsync(result.FileUrl).ConfigureAwait(false);
+            // The exported file lives on a different (storage) host, so use a plain factory client rather
+            // than the typed client whose Kami Authorization header would otherwise be sent to that host.
+            var downloadClient = _httpClientFactory.CreateClient(ExportDownloadClientName);
+            result.FileBytes = await downloadClient.GetByteArrayAsync(result.FileUrl, cancellationToken).ConfigureAwait(false);
         }
 
         return result ?? new KamiDocumentExportResult
@@ -180,7 +201,7 @@ public class KamiClient : IKamiClient
         };
     }
 
-    private async Task<KamiDocumentExportResult> CreateDocumentExport(string documentIdentifier, string exportType)
+    private async Task<KamiDocumentExportResult> CreateDocumentExport(string documentIdentifier, string exportType, CancellationToken cancellationToken)
     {
         var requestJson = JsonConvert.SerializeObject(new
         {
@@ -188,8 +209,8 @@ public class KamiClient : IKamiClient
             ExportType = exportType
         }, JsonSerialization.GetDefaultSerializerSettings());
 
-        using var content = new StringContent(requestJson, Encoding.Default, "application/json");
-        using var response = await _httpClient.PostAsync("embed/exports", content).ConfigureAwait(false);
+        using var content = new StringContent(requestJson, Encoding.UTF8, "application/json");
+        using var response = await _httpClient.PostAsync("embed/exports", content, cancellationToken).ConfigureAwait(false);
         if (!response.IsSuccessStatusCode)
         {
             return new KamiDocumentExportResult
@@ -201,7 +222,7 @@ public class KamiClient : IKamiClient
 
         try
         {
-            var data = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+            var data = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
             return JsonConvert.DeserializeObject<KamiDocumentExportResult>(data, JsonSerialization.GetDefaultSerializerSettings()) ?? new KamiDocumentExportResult
             {
                 Status = "error",
@@ -218,9 +239,9 @@ public class KamiClient : IKamiClient
         }
     }
 
-    private async Task<KamiDocumentExportResult> GetDocumentExport(string exportId)
+    private async Task<KamiDocumentExportResult> GetDocumentExport(string exportId, CancellationToken cancellationToken)
     {
-        using var response = await _httpClient.GetAsync("embed/exports/" + exportId).ConfigureAwait(false);
+        using var response = await _httpClient.GetAsync("embed/exports/" + exportId, cancellationToken).ConfigureAwait(false);
         if (!response.IsSuccessStatusCode)
         {
             return new KamiDocumentExportResult
@@ -232,7 +253,7 @@ public class KamiClient : IKamiClient
 
         try
         {
-            var data = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+            var data = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
             return JsonConvert.DeserializeObject<KamiDocumentExportResult>(data, JsonSerialization.GetDefaultSerializerSettings()) ?? new KamiDocumentExportResult
             {
                 Status = "error",
