@@ -29,25 +29,29 @@ public static class ServiceCollectionExtensions
         Guard.Against.NullOrEmpty(address, nameof(address), "Missing Kami BaseAddress in settings.");
         Guard.Against.NullOrEmpty(token, nameof(token), "Missing Kami Token in settings.");
 
-        services.AddHttpClient<IKamiClient, KamiClient>(client =>
+        services.AddHttpClient<IKamiClient, KamiClient>((serviceProvider, client) =>
         {
+            var options = serviceProvider.GetRequiredService<IOptions<KamiOptions>>().Value;
             client.BaseAddress = new Uri(address);
             client.DefaultRequestHeaders.TryAddWithoutValidation("authorization", token);
+
+            // Cap the whole call (including retries) with HttpClient.Timeout rather than a Polly timeout
+            // strategy. A timeout then surfaces to callers as a plain TaskCanceledException instead of a
+            // Polly TimeoutRejectedException, and it still applies if a host opts the client out of
+            // resilience handlers (e.g. RemoveAllResilienceHandlers under .NET Aspire defaults).
+            client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
         })
         .AddResilienceHandler("kami", (pipeline, context) =>
         {
             var options = context.ServiceProvider.GetRequiredService<IOptions<KamiOptions>>().Value;
 
-            // Retry transient failures (5xx, 408, network errors) with exponential backoff, then cap the
-            // whole call with a timeout. A timeout surfaces to callers as a TaskCanceledException.
-            pipeline
-                .AddRetry(new HttpRetryStrategyOptions
-                {
-                    MaxRetryAttempts = options.RetryCount,
-                    BackoffType = DelayBackoffType.Exponential,
-                    UseJitter = true,
-                })
-                .AddTimeout(TimeSpan.FromSeconds(options.TimeoutSeconds));
+            // Retry transient failures (5xx, 408, network errors) with exponential backoff and jitter.
+            pipeline.AddRetry(new HttpRetryStrategyOptions
+            {
+                MaxRetryAttempts = options.RetryCount,
+                BackoffType = DelayBackoffType.Exponential,
+                UseJitter = true,
+            });
 
             configureResilience?.Invoke(pipeline);
         });
