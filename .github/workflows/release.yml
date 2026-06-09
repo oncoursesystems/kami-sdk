@@ -36,6 +36,9 @@ jobs:
   publish:
     runs-on: k8s-linux
     needs: build
+    permissions:
+      id-token: write   # mint the OIDC token for trusted publishing
+      contents: read    # required for checkout once permissions are set explicitly
     env:
       DOTNET_INSTALL_DIR: ${{ github.workspace }}/.dotnet
 
@@ -61,5 +64,11 @@ jobs:
           name: Nuget package
           path: "**/*.nupkg"
 
+      - name: NuGet login (OIDC -> temp API key)
+        uses: NuGet/login@v1
+        id: login
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
       - name: Publish NuGet Package
-        run: dotnet nuget push "**/*.nupkg" -k ${{ secrets.NUGET_TOKEN }} -s https://api.nuget.org/v3/index.json
+        run: dotnet nuget push "**/*.nupkg" --api-key ${{ steps.login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json
