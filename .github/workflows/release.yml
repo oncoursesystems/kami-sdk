@@ -8,18 +8,20 @@ on:
 jobs:
   build:
     runs-on: k8s-linux
+    env:
+      DOTNET_INSTALL_DIR: ${{ github.workspace }}/.dotnet
     strategy:
       fail-fast: false
       matrix:
         target: [net8.0, net10.0]
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: |
             8.0.x
@@ -34,13 +36,27 @@ jobs:
   publish:
     runs-on: k8s-linux
     needs: build
+    env:
+      DOTNET_INSTALL_DIR: ${{ github.workspace }}/.dotnet
 
     steps:
+      - name: Checkout Code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
       - name: Build NuGet Package
-        run: dotnet pack -c Release -p:PackageVersion=${{  github.ref_name }}
+        run: dotnet pack -c Release -p:PackageVersion=${{ github.ref_name }}
 
       - name: Upload nuget package artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Nuget package
           path: "**/*.nupkg"
