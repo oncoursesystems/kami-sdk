@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: self-hosted
+    runs-on: k8s-linux
     strategy:
       fail-fast: false
       matrix:
@@ -32,7 +32,7 @@ jobs:
         run: dotnet build -c release -f ${{ matrix.target }} --no-restore
 
   publish:
-    runs-on: self-hosted
+    runs-on: k8s-linux
     needs: build
 
     steps:
