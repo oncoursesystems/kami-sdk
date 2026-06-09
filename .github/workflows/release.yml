@@ -11,19 +11,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [net6.0, net7.0]
+        target: [net8.0, net10.0]
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v3
+        uses: actions/setup-dotnet@v4
         with:
           dotnet-version: |
-            6.0.x
-            7.0.x
+            8.0.x
+            10.0.x
 
       - name: Restore test dependencies
         run: dotnet restore
@@ -40,7 +40,7 @@ jobs:
         run: dotnet pack -c Release -p:PackageVersion=${{  github.ref_name }}
 
       - name: Upload nuget package artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: Nuget package
           path: "**/*.nupkg"

@@ -20,7 +20,7 @@ Kami API library helps to generate requests for the following services:
 
 ## ⭐ Installation
 
-This project is a class library built for compatibility all the back to .NET Standard 2.0.
+This project is a class library targeting .NET 8 and .NET 10.
 
 To install the OnCourse.Kami NuGet package, run the following command via the dotnet CLI
 
@@ -56,18 +56,24 @@ var app = builder.Build();
 
 ### Fault Handling / Resilience
 
-By default, the client will be configured to retry a call up to three times with increasing waits between (1s, 5s, 10s). If after the third call the service still returns an error then the call will be considered failed. You can override this policy during the UseKami method by passing in a policy as the second parameter. It is recommended to use [Polly](https://github.com/App-vNext/Polly), a 3rd-party library, that has a lot of options for creating policies
+The client is configured with a [Polly v8](https://github.com/App-vNext/Polly) resilience pipeline (via `Microsoft.Extensions.Http.Resilience`) that retries transient failures with exponential backoff and jitter, then caps the whole call with a timeout. Both are configured from the `Kami` settings section — by default, **3 retries** and a **100 second timeout** (see [Configuration](#configuration)). A timeout surfaces to callers as a `TaskCanceledException`.
+
+For advanced scenarios you can customize the pipeline directly by passing a configuration action as the second parameter:
 
 ```csharp
+using Polly;
 
-builder.Services.AddKamiClient(builder.Configuration, (p => p.WaitAndRetryAsync(new[]
+builder.Services.AddKamiClient(builder.Configuration, pipeline =>
 {
-    TimeSpan.FromSeconds(1),
-    TimeSpan.FromSeconds(5),
-    TimeSpan.FromSeconds(10)
-}));
-
+    pipeline.AddConcurrencyLimiter(10);
+});
 ```
+
+> **Note:** if you host with .NET Aspire `ServiceDefaults` (or otherwise call `AddStandardResilienceHandler` via `ConfigureHttpClientDefaults`), that global handler is *also* applied to the Kami client and will layer a second pipeline on top. To let this SDK own Kami's resilience, opt the client out of the global handler:
+>
+> ```csharp
+> builder.Services.AddHttpClient(nameof(IKamiClient)).RemoveAllResilienceHandlers();
+> ```
 
 ### Configuration
 
@@ -78,6 +84,10 @@ Additional configuration can be done in the appSettings.config file within the "
   "Kami": {
     "Token": "Token #####################",
     "BaseAddress": "https://api.notablepdf.com/",
+    "TimeoutSeconds": 100,
+    "RetryCount": 3,
+    "ExportPollIntervalSeconds": 2,
+    "ExportMaxPollAttempts": 60,
     "AllowedExtensions": [
       "doc",
       "docx",
