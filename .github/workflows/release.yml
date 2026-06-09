@@ -56,13 +56,13 @@ jobs:
             10.0.x
 
       - name: Build NuGet Package
-        run: dotnet pack -c Release -p:PackageVersion=${{ github.ref_name }}
+        run: dotnet pack -c Release -p:PackageVersion=${{ github.ref_name }} --output ${{ github.workspace }}/artifacts
 
       - name: Upload nuget package artifact
         uses: actions/upload-artifact@v7
         with:
           name: Nuget package
-          path: "**/*.nupkg"
+          path: ${{ github.workspace }}/artifacts/*.nupkg
 
       - name: NuGet login (OIDC -> temp API key)
         uses: NuGet/login@v1
@@ -71,4 +71,4 @@ jobs:
           user: ${{ secrets.NUGET_USER }}
 
       - name: Publish NuGet Package
-        run: dotnet nuget push "**/*.nupkg" --api-key ${{ steps.login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+        run: dotnet nuget push "${{ github.workspace }}/artifacts/*.nupkg" --api-key ${{ steps.login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
