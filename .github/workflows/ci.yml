@@ -15,7 +15,7 @@ jobs:
       fail-fast: false
       matrix:
         target: [net8.0, net10.0]
-    runs-on: k8s-linux
+    runs-on: linux
     env:
       DOTNET_INSTALL_DIR: ${{ github.workspace }}/.dotnet
     steps:

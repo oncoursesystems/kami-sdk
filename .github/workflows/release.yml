@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: k8s-linux
+    runs-on: linux
     env:
       DOTNET_INSTALL_DIR: ${{ github.workspace }}/.dotnet
     strategy:
@@ -34,7 +34,7 @@ jobs:
         run: dotnet build -c release -f ${{ matrix.target }} --no-restore
 
   publish:
-    runs-on: k8s-linux
+    runs-on: linux
     needs: build
     permissions:
       id-token: write   # mint the OIDC token for trusted publishing
