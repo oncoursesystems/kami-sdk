@@ -7,9 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: linux
-    env:
-      DOTNET_INSTALL_DIR: ${{ github.workspace }}/.dotnet
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
@@ -34,13 +32,11 @@ jobs:
         run: dotnet build -c release -f ${{ matrix.target }} --no-restore
 
   publish:
-    runs-on: linux
+    runs-on: ubuntu-latest
     needs: build
     permissions:
-      id-token: write   # mint the OIDC token for trusted publishing
-      contents: read    # required for checkout once permissions are set explicitly
-    env:
-      DOTNET_INSTALL_DIR: ${{ github.workspace }}/.dotnet
+      id-token: write
+      contents: read
 
     steps:
       - name: Checkout Code
